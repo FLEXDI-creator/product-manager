@@ -26,7 +26,8 @@ const TABS = [
   { id: "ROOMTEMP", label: "ROOMTEMP",   sub: "실온제품" },
   { id: "PET",      label: "PET",        sub: "펫용품" },
   { id: "KBEAUTY",  label: "K-BEAUTY",   sub: "화장품" },
-  { id: "BRAND",    label: "자체브랜드",  sub: "" },
+  { id: "BRAND",    label: "자체브랜드",  sub: "청해담" },
+  { id: "NEW",      label: "NEW",        sub: "신제품" },
 ];
 
 const FIELDS = [
@@ -44,6 +45,8 @@ const FIELDS = [
   { key: "hscode",        label: "HSCODE",             type: "text",   placeholder: "예) 0304.89-4000" },
   { key: "barcode",       label: "Barcode",            type: "text" },
   { key: "category",      label: "Category",           type: "text",   placeholder: "예) seafood" },
+  { key: "MMAP",         label: "MMAP",               type: "text" },
+  { key: "COA",          label: "COA",                type: "text" },
 ];
 
 const EMPTY = Object.fromEntries(FIELDS.map(f => [f.key, ""]));
