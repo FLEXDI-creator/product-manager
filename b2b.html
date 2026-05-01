@@ -12,6 +12,11 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Noto Sans KR', sans-serif; background: #f0f4f8; }
     #root { max-width: 480px; margin: 0 auto; background: #fff; min-height: 100vh; }
+    @media print {
+      body { background: #fff; }
+      #root { max-width: 100%; }
+      .no-print { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -21,7 +26,6 @@ const { useState, useEffect, useRef } = React;
 
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-w7HA3OZR-yGstuywW8CBqsVbQ5kl_l1eDT0lpP9eRoy_ZVnM8KXoZHTjzgzrWt_l/exec";
 
-// 비밀번호 설정 (여러 거래처 추가 가능)
 const PASSWORDS = {
   "flexdi2024": "청해담 본사",
   "buyer001":   "거래처A",
@@ -35,81 +39,252 @@ const TABS = [
   { id: "PET",      label: "PET",       sub: "펫" },
   { id: "KBEAUTY",  label: "K-BEAUTY",  sub: "뷰티" },
   { id: "BRAND",    label: "자체브랜드", sub: "" },
+  { id: "NEW",      label: "NEW",       sub: "신제품" },
 ];
 
-function fmtPrice(v) { return v ? Number(v).toLocaleString() : "-"; }
+function fmt(v) { return v ? Number(v).toLocaleString() : "-"; }
+function fmtCbm(v) { return Number(v||0).toFixed(4); }
 
-// ── 비밀번호 화면 ──
+// ── 로그인 ──
 function LoginScreen({ onLogin }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
-
   function handleLogin() {
     const company = PASSWORDS[pw.trim()];
-    if (company) {
-      onLogin(company);
-    } else {
-      setErr("비밀번호가 올바르지 않습니다.");
-    }
+    if (company) onLogin(company);
+    else setErr("비밀번호가 올바르지 않습니다.");
+  }
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:32, background:"#f0f4f8" }}>
+      <div style={{ width:"100%", maxWidth:360 }}>
+        <div style={{ textAlign:"center", marginBottom:40 }}>
+          <div style={{ fontSize:32, fontWeight:800, color:"#2d3748", letterSpacing:-1 }}>청해담</div>
+          <div style={{ fontSize:14, color:"#718096", marginTop:6 }}>B2B 발주 시스템</div>
+        </div>
+        <div style={{ background:"#fff", borderRadius:20, padding:28, boxShadow:"0 4px 24px rgba(0,0,0,0.08)" }}>
+          <div style={{ fontWeight:700, fontSize:15, marginBottom:10 }}>비밀번호 입력</div>
+          <input type="password" value={pw} onChange={e => { setPw(e.target.value); setErr(""); }}
+            onKeyDown={e => e.key==="Enter" && handleLogin()} placeholder="거래처 비밀번호"
+            style={{ width:"100%", padding:"14px 16px", border:"1.5px solid #e2e8f0", borderRadius:12, fontSize:15, outline:"none", marginBottom:12 }}/>
+          {err && <div style={{ color:"#e53e3e", fontSize:13, marginBottom:10 }}>{err}</div>}
+          <button onClick={handleLogin} style={{ width:"100%", padding:15, background:"#2b6cb0", color:"#fff", border:"none", borderRadius:12, fontSize:16, fontWeight:700, cursor:"pointer" }}>로그인</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 주문서 (PDF 출력용) ──
+function OrderSheet({ order, company, onBack, onNewOrder }) {
+  const today = new Date().toLocaleDateString("ko-KR");
+  const logistics_ = Number(order.logistics)||0;
+  const domestic_ = Number(order.domestic)||0;
+  const discount_ = Number(order.discount)||0;
+  const grandTotal = order.totalAmt + logistics_ + domestic_ - discount_;
+
+  return (
+    <div style={{ background:"#fff", minHeight:"100vh", padding:20 }}>
+      <div className="no-print" style={{ display:"flex", gap:10, marginBottom:20 }}>
+        <button onClick={onBack} style={{ padding:"10px 16px", border:"1.5px solid #e2e8f0", borderRadius:10, background:"#fff", cursor:"pointer", fontWeight:600, fontSize:14 }}>← 뒤로</button>
+        <button onClick={() => window.print()} style={{ flex:1, padding:"10px 16px", background:"#2b6cb0", color:"#fff", border:"none", borderRadius:10, fontWeight:700, cursor:"pointer", fontSize:14 }}>🖨 PDF 출력</button>
+        <button onClick={onNewOrder} style={{ padding:"10px 16px", border:"none", background:"#48bb78", color:"#fff", borderRadius:10, fontWeight:700, cursor:"pointer", fontSize:14 }}>+ 새 발주</button>
+      </div>
+
+      <div style={{ border:"2px solid #2b6cb0", borderRadius:12, overflow:"hidden" }}>
+        <div style={{ background:"#2b6cb0", color:"#fff", padding:"16px 20px" }}>
+          <div style={{ fontWeight:800, fontSize:20 }}>청해담 발주서</div>
+          <div style={{ fontSize:13, opacity:0.85, marginTop:4 }}>{today} · {company} · {order.customerName}</div>
+        </div>
+
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+            <thead>
+              <tr style={{ background:"#ebf4ff" }}>
+                <th style={{ padding:"10px 8px", textAlign:"left", borderBottom:"1px solid #bee3f8" }}>품목</th>
+                <th style={{ padding:"10px 8px", textAlign:"center", borderBottom:"1px solid #bee3f8", whiteSpace:"nowrap" }}>단가</th>
+                <th style={{ padding:"10px 8px", textAlign:"center", borderBottom:"1px solid #bee3f8", whiteSpace:"nowrap" }}>박스</th>
+                <th style={{ padding:"10px 8px", textAlign:"center", borderBottom:"1px solid #bee3f8", whiteSpace:"nowrap" }}>CBM</th>
+                <th style={{ padding:"10px 8px", textAlign:"right", borderBottom:"1px solid #bee3f8", whiteSpace:"nowrap" }}>금액</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.items.map((item, i) => (
+                <tr key={i} style={{ borderBottom:"1px solid #f0f0f0" }}>
+                  <td style={{ padding:"10px 8px" }}>
+                    <div style={{ fontWeight:700, fontSize:12 }}>{item.name}</div>
+                    <div style={{ color:"#718096", fontSize:11 }}>{item.sku} · {item.weight}</div>
+                  </td>
+                  <td style={{ padding:"10px 8px", textAlign:"center", whiteSpace:"nowrap" }}>{fmt(item.price)}</td>
+                  <td style={{ padding:"10px 8px", textAlign:"center", fontWeight:700 }}>{item.qty}</td>
+                  <td style={{ padding:"10px 8px", textAlign:"center", color:"#2b6cb0" }}>{fmtCbm(item.itemCbm)}</td>
+                  <td style={{ padding:"10px 8px", textAlign:"right", fontWeight:700, whiteSpace:"nowrap" }}>{fmt(item.subtotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ padding:"16px 20px", background:"#f7fafc", borderTop:"2px solid #e2e8f0" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+            <span style={{ color:"#718096" }}>소계</span><span style={{ fontWeight:700 }}>{fmt(order.totalAmt)}원</span>
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+            <span style={{ color:"#718096" }}>총 CBM</span><span style={{ fontWeight:700, color:"#2b6cb0" }}>{fmtCbm(order.totalCbm)} CBM</span>
+          </div>
+          {logistics_ > 0 && <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}><span style={{ color:"#718096" }}>물류비</span><span>+{fmt(logistics_)}원</span></div>}
+          {domestic_ > 0 && <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}><span style={{ color:"#718096" }}>국내배송비</span><span>+{fmt(domestic_)}원</span></div>}
+          {discount_ > 0 && <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}><span style={{ color:"#718096" }}>할인</span><span style={{ color:"#e53e3e" }}>-{fmt(discount_)}원</span></div>}
+          <div style={{ display:"flex", justifyContent:"space-between", paddingTop:12, borderTop:"2px solid #2b6cb0", marginTop:8 }}>
+            <span style={{ fontWeight:800, fontSize:16 }}>최종 합계</span>
+            <span style={{ fontWeight:800, fontSize:18, color:"#2b6cb0" }}>{fmt(grandTotal)}원</span>
+          </div>
+        </div>
+
+        {order.memo && (
+          <div style={{ padding:"12px 20px", borderTop:"1px solid #e2e8f0" }}>
+            <div style={{ color:"#718096", fontSize:12, marginBottom:4 }}>메모</div>
+            <div style={{ fontSize:13 }}>{order.memo}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── 발주함 ──
+function CartScreen({ cart, setCart, company, onSubmit, onBack, submitting }) {
+  const [customerName, setCustomerName] = useState("");
+  const [logistics, setLogistics] = useState("");
+  const [domestic, setDomestic] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [memo, setMemo] = useState("");
+
+  const items = Object.values(cart).filter(i => i.qty > 0);
+  const totalAmt = items.reduce((s, i) => s + (Number(i.purchasePrice)||0) * i.qty, 0);
+  const totalCbm = items.reduce((s, i) => s + (Number(i.cbm)||0) * i.qty, 0);
+  const grandTotal = totalAmt + (Number(logistics)||0) + (Number(domestic)||0) - (Number(discount)||0);
+
+  function setQty(id, qty) {
+    if (qty <= 0) setCart(c => { const n={...c}; delete n[id]; return n; });
+    else setCart(c => ({...c, [id]: {...c[id], qty}}));
+  }
+
+  function handleSubmit() {
+    if (!customerName.trim()) { alert("거래처명을 입력해주세요."); return; }
+    if (items.length === 0) { alert("발주 제품을 선택해주세요."); return; }
+    const orderItems = items.map(i => ({
+      sku: i.sku, name: i.name, engName: i.engName, weight: i.weight,
+      price: Number(i.purchasePrice)||0, qty: i.qty,
+      itemCbm: (Number(i.cbm)||0) * i.qty,
+      subtotal: (Number(i.purchasePrice)||0) * i.qty
+    }));
+    onSubmit({ customerName, items: orderItems, logistics, domestic, discount, memo, totalAmt, totalCbm, grandTotal });
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, background: "#f0f4f8" }}>
-      <div style={{ width: "100%", maxWidth: 360 }}>
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontSize: 32, fontWeight: 800, color: "#2d3748", letterSpacing: -1 }}>청해담</div>
-          <div style={{ fontSize: 14, color: "#718096", marginTop: 6 }}>B2B 발주 시스템</div>
+    <div style={{ background:"#fff", minHeight:"100vh", display:"flex", flexDirection:"column" }}>
+      <div style={{ padding:"20px 20px 0" }}>
+        <button onClick={onBack} style={{ background:"none", border:"none", cursor:"pointer", fontSize:22, color:"#2b6cb0", padding:0, marginBottom:12 }}>←</button>
+        <div style={{ fontWeight:800, fontSize:20, marginBottom:4 }}>발주 확인</div>
+        <div style={{ color:"#718096", fontSize:13, marginBottom:16 }}>{company}</div>
+      </div>
+
+      <div style={{ flex:1, padding:"0 20px", overflowY:"auto", paddingBottom:100 }}>
+        <div style={{ marginBottom:16 }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:6 }}>거래처명 *</div>
+          <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="거래처명 입력"
+            style={{ width:"100%", padding:"12px 14px", border:"1.5px solid #e2e8f0", borderRadius:10, fontSize:14, outline:"none" }}/>
         </div>
-        <div style={{ background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 10, color: "#2d3748" }}>비밀번호 입력</div>
-          <input
-            type="password"
-            value={pw}
-            onChange={e => { setPw(e.target.value); setErr(""); }}
-            onKeyDown={e => e.key === "Enter" && handleLogin()}
-            placeholder="거래처 비밀번호"
-            style={{ width: "100%", padding: "14px 16px", border: "1.5px solid #e2e8f0", borderRadius: 12, fontSize: 15, outline: "none", marginBottom: 12 }}
-          />
-          {err && <div style={{ color: "#e53e3e", fontSize: 13, marginBottom: 10 }}>{err}</div>}
-          <button onClick={handleLogin} style={{ width: "100%", padding: 15, background: "#2b6cb0", color: "#fff", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: "pointer" }}>
-            로그인
-          </button>
-        </div>
+
+        <div style={{ fontWeight:700, fontSize:13, marginBottom:8 }}>발주 품목 ({items.length}종)</div>
+        {items.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"30px 0", color:"#aaa", fontSize:13 }}>발주 제품 없음</div>
+        ) : (
+          <>
+            {items.map(item => (
+              <div key={item.id} style={{ padding:"12px 0", borderBottom:"1px solid #f0f0f0" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:6 }}>
+                  {item.image
+                    ? <img src={item.image} style={{ width:44, height:44, borderRadius:8, objectFit:"cover", flexShrink:0 }}/>
+                    : <div style={{ width:44, height:44, borderRadius:8, background:"#f5f5f5", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>📦</div>
+                  }
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:700, fontSize:13 }}>{item.name}</div>
+                    <div style={{ color:"#718096", fontSize:11 }}>{item.sku} · {item.weight}</div>
+                  </div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#f7fafc", borderRadius:8, padding:"8px 12px" }}>
+                  <div style={{ fontSize:12 }}>
+                    <span style={{ color:"#718096" }}>CBM: </span><b style={{ color:"#2b6cb0" }}>{fmtCbm((Number(item.cbm)||0)*item.qty)}</b>
+                    <span style={{ color:"#718096", marginLeft:8 }}>금액: </span><b>{fmt((Number(item.purchasePrice)||0)*item.qty)}원</b>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <button onClick={() => setQty(item.id, item.qty-1)} style={{ width:28, height:28, border:"1.5px solid #e2e8f0", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16 }}>−</button>
+                    <span style={{ fontSize:15, fontWeight:700, minWidth:24, textAlign:"center" }}>{item.qty}</span>
+                    <button onClick={() => setQty(item.id, item.qty+1)} style={{ width:28, height:28, border:"1.5px solid #2b6cb0", borderRadius:8, background:"#ebf4ff", cursor:"pointer", fontSize:16 }}>+</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* 소계 */}
+            <div style={{ background:"#ebf4ff", borderRadius:10, padding:"12px 16px", margin:"12px 0" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                <span style={{ fontSize:13 }}>소계</span><span style={{ fontWeight:700 }}>{fmt(totalAmt)}원</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ fontSize:13 }}>총 CBM</span><span style={{ fontWeight:700, color:"#2b6cb0" }}>{fmtCbm(totalCbm)} CBM</span>
+              </div>
+            </div>
+
+            {/* 추가 항목 */}
+            <div style={{ fontWeight:700, fontSize:13, marginBottom:8 }}>추가 항목</div>
+            {[
+              { label:"물류비", value:logistics, setter:setLogistics, sign:"+", color:"#2d3748" },
+              { label:"국내배송비", value:domestic, setter:setDomestic, sign:"+", color:"#2d3748" },
+              { label:"할인", value:discount, setter:setDiscount, sign:"-", color:"#e53e3e" },
+            ].map(f => (
+              <div key={f.label} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
+                <span style={{ fontSize:13, color:f.color, width:90, flexShrink:0, fontWeight:600 }}>{f.sign} {f.label}</span>
+                <input type="number" value={f.value} onChange={e => f.setter(e.target.value)} placeholder="0"
+                  style={{ flex:1, padding:"10px 14px", border:"1.5px solid #e2e8f0", borderRadius:10, fontSize:14, outline:"none", textAlign:"right" }}/>
+                <span style={{ fontSize:13, color:"#718096" }}>원</span>
+              </div>
+            ))}
+
+            {/* 최종 합계 */}
+            <div style={{ background:"#2b6cb0", borderRadius:10, padding:"14px 16px", marginTop:8, marginBottom:16 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                <span style={{ color:"rgba(255,255,255,0.8)", fontSize:13 }}>총 CBM</span>
+                <span style={{ color:"#fff", fontWeight:700 }}>{fmtCbm(totalCbm)} CBM</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:"rgba(255,255,255,0.8)", fontSize:14 }}>최종 합계</span>
+                <span style={{ color:"#fff", fontWeight:800, fontSize:18 }}>{fmt(grandTotal)}원</span>
+              </div>
+            </div>
+
+            {/* 메모 */}
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontWeight:700, fontSize:13, marginBottom:6 }}>메모</div>
+              <textarea value={memo} onChange={e => setMemo(e.target.value)} placeholder="특이사항 입력..."
+                style={{ width:"100%", padding:"12px 14px", border:"1.5px solid #e2e8f0", borderRadius:10, fontSize:14, outline:"none", height:80, resize:"none" }}/>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:480, padding:"12px 20px 28px", background:"#fff", borderTop:"1px solid #f0f0f0" }}>
+        <button onClick={handleSubmit} disabled={submitting||items.length===0} style={{
+          width:"100%", padding:15, background:submitting||items.length===0?"#a0aec0":"#2b6cb0",
+          color:"#fff", border:"none", borderRadius:12, fontSize:16, fontWeight:700, cursor:submitting||items.length===0?"default":"pointer"
+        }}>{submitting?"저장 중...":"📋 발주 제출 → 주문서 출력"}</button>
       </div>
     </div>
   );
 }
 
-// ── 발주 완료 화면 ──
-function OrderComplete({ order, onBack }) {
-  return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-        <div style={{ fontWeight: 800, fontSize: 22, color: "#2d3748", marginBottom: 8 }}>발주 완료!</div>
-        <div style={{ color: "#718096", fontSize: 14 }}>구글 시트에 기록되었습니다</div>
-      </div>
-      <div style={{ background: "#f7fafc", borderRadius: 16, padding: 20, width: "100%", maxWidth: 400, marginBottom: 24 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12, color: "#2d3748" }}>발주 내역</div>
-        {order.items.map((item, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #e2e8f0" }}>
-            <span style={{ fontSize: 14, color: "#4a5568" }}>{item.name}</span>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>×{item.qty} ({fmtPrice(item.price * item.qty)}원)</span>
-          </div>
-        ))}
-        <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 12, fontWeight: 800, fontSize: 16 }}>
-          <span>합계</span>
-          <span style={{ color: "#2b6cb0" }}>{fmtPrice(order.total)}원</span>
-        </div>
-      </div>
-      <button onClick={onBack} style={{ padding: "14px 32px", background: "#2b6cb0", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
-        계속 발주하기
-      </button>
-    </div>
-  );
-}
-
-// ── 메인 앱 ──
+// ── 메인 ──
 function App() {
   const [company, setCompany] = useState(null);
   const [activeTab, setActiveTab] = useState("Frozen");
@@ -117,8 +292,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState({});
-  const [showCart, setShowCart] = useState(false);
-  const [customerName, setCustomerName] = useState("");
+  const [screen, setScreen] = useState("list");
   const [submitting, setSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
 
@@ -135,194 +309,99 @@ function App() {
     setLoading(false);
   }
 
-  function addToCart(product) {
-    setCart(c => ({ ...c, [product.id]: { ...product, qty: (c[product.id]?.qty || 0) + 1 } }));
-  }
-
+  function addToCart(p) { setCart(c => ({...c, [p.id]: {...p, qty:(c[p.id]?.qty||0)+1}})); }
   function setQty(id, qty) {
-    if (qty <= 0) {
-      setCart(c => { const n = { ...c }; delete n[id]; return n; });
-    } else {
-      setCart(c => ({ ...c, [id]: { ...c[id], qty } }));
-    }
+    if (qty <= 0) setCart(c => { const n={...c}; delete n[id]; return n; });
+    else setCart(c => ({...c, [id]: {...c[id], qty}}));
   }
 
-  const cartItems = Object.values(cart).filter(i => i.qty > 0);
-  const cartTotal = cartItems.reduce((s, i) => s + (Number(i.purchasePrice) || 0) * i.qty, 0);
-  const cartCount = cartItems.reduce((s, i) => s + i.qty, 0);
-
-  async function submitOrder() {
-    if (!customerName.trim()) { alert("거래처명을 입력해주세요."); return; }
-    if (cartItems.length === 0) { alert("발주할 제품을 선택해주세요."); return; }
+  async function handleSubmit(orderData) {
     setSubmitting(true);
     try {
-      const items = cartItems.map(i => ({
-        sku: i.sku, name: i.name, engName: i.engName,
-        price: Number(i.purchasePrice) || 0, qty: i.qty,
-        subtotal: (Number(i.purchasePrice) || 0) * i.qty
-      }));
-      const payload = {
-        action: "addOrder",
-        timestamp: new Date().toISOString(),
-        company: company,
-        customerName: customerName.trim(),
-        items: JSON.stringify(items),
-        total: cartTotal,
-        status: "신규"
-      };
-      const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify(payload) });
-      const text = await res.text();
-      const data = JSON.parse(text);
-      if (data.ok) {
-        setCompletedOrder({ items, total: cartTotal });
-        setCart({});
-        setShowCart(false);
-        setCustomerName("");
-      } else {
-        alert("발주 실패. 다시 시도해주세요.");
-      }
-    } catch { alert("연결 오류. 다시 시도해주세요."); }
+      await fetch(SCRIPT_URL, { method:"POST", body:JSON.stringify({
+        action:"addOrder", timestamp:new Date().toISOString(), company,
+        customerName:orderData.customerName, items:JSON.stringify(orderData.items),
+        totalAmt:orderData.totalAmt, totalCbm:orderData.totalCbm,
+        logistics:orderData.logistics, domestic:orderData.domestic,
+        discount:orderData.discount, grandTotal:orderData.grandTotal,
+        memo:orderData.memo, status:"신규"
+      })});
+      setCompletedOrder({...orderData, company});
+      setCart({});
+      setScreen("sheet");
+    } catch { alert("저장 실패. 다시 시도해주세요."); }
     setSubmitting(false);
   }
 
+  const cartCount = Object.values(cart).reduce((s, i) => s+i.qty, 0);
   const filtered = products.filter(p =>
     p.tab === activeTab &&
-    (!search || (p.name && p.name.includes(search)) || (p.engName && p.engName.toLowerCase().includes(search.toLowerCase())) || (p.sku && p.sku.includes(search)))
+    (!search || (p.name&&p.name.includes(search)) || (p.engName&&p.engName.toLowerCase().includes(search.toLowerCase())) || (p.sku&&p.sku.includes(search)))
   );
-
   const activeCat = TABS.find(t => t.id === activeTab);
 
-  if (!company) return <LoginScreen onLogin={c => setCompany(c)} />;
-  if (completedOrder) return <OrderComplete order={completedOrder} onBack={() => setCompletedOrder(null)} />;
-
-  // 장바구니 화면
-  if (showCart) return (
-    <div style={{ background: "#fff", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "20px 20px 0" }}>
-        <button onClick={() => setShowCart(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#2b6cb0", padding: 0, marginBottom: 16 }}>←</button>
-        <div style={{ fontWeight: 800, fontSize: 20, marginBottom: 4 }}>발주 확인</div>
-        <div style={{ color: "#718096", fontSize: 13, marginBottom: 20 }}>{company}</div>
-      </div>
-
-      <div style={{ flex: 1, padding: "0 20px", overflowY: "auto" }}>
-        {/* 거래처명 */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, color: "#2d3748" }}>거래처명 *</div>
-          <input
-            value={customerName}
-            onChange={e => setCustomerName(e.target.value)}
-            placeholder="거래처명 입력"
-            style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #e2e8f0", borderRadius: 10, fontSize: 14, outline: "none" }}
-          />
-        </div>
-
-        {/* 발주 목록 */}
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: "#2d3748" }}>발주 목록</div>
-        {cartItems.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "#aaa" }}>발주 제품 없음</div>
-        ) : (
-          cartItems.map(item => (
-            <div key={item.id} style={{ display: "flex", alignItems: "center", padding: "12px 0", borderBottom: "1px solid #f0f0f0", gap: 12 }}>
-              {item.image
-                ? <img src={item.image} alt={item.name} style={{ width: 52, height: 52, borderRadius: 8, objectFit: "cover", flexShrink: 0 }}/>
-                : <div style={{ width: 52, height: 52, borderRadius: 8, background: "#f5f5f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>📦</div>
-              }
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3 }}>{item.name}</div>
-                <div style={{ color: "#718096", fontSize: 12 }}>{fmtPrice(item.purchasePrice)}원 × {item.qty} = <b style={{ color: "#2b6cb0" }}>{fmtPrice(Number(item.purchasePrice) * item.qty)}원</b></div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <button onClick={() => setQty(item.id, item.qty - 1)} style={{ width: 28, height: 28, border: "1.5px solid #e2e8f0", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                <span style={{ fontSize: 15, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{item.qty}</span>
-                <button onClick={() => setQty(item.id, item.qty + 1)} style={{ width: 28, height: 28, border: "1.5px solid #e2e8f0", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-              </div>
-            </div>
-          ))
-        )}
-
-        {/* 합계 */}
-        {cartItems.length > 0 && (
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "16px 0", fontWeight: 800, fontSize: 18, borderTop: "2px solid #2b6cb0", marginTop: 8 }}>
-            <span>총 발주금액</span>
-            <span style={{ color: "#2b6cb0" }}>{fmtPrice(cartTotal)}원</span>
-          </div>
-        )}
-      </div>
-
-      {/* 제출 버튼 */}
-      <div style={{ padding: "16px 20px 32px", borderTop: "1px solid #f0f0f0" }}>
-        <button onClick={submitOrder} disabled={submitting || cartItems.length === 0} style={{
-          width: "100%", padding: 16, background: submitting || cartItems.length === 0 ? "#a0aec0" : "#2b6cb0",
-          color: "#fff", border: "none", borderRadius: 14, fontSize: 16, fontWeight: 700,
-          cursor: submitting || cartItems.length === 0 ? "default" : "pointer"
-        }}>
-          {submitting ? "발주 중..." : `발주 제출 (${cartItems.length}종 / ${fmtPrice(cartTotal)}원)`}
-        </button>
-      </div>
-    </div>
+  if (!company) return <LoginScreen onLogin={c => setCompany(c)}/>;
+  if (screen==="sheet" && completedOrder) return (
+    <OrderSheet order={completedOrder} company={company}
+      onBack={() => setScreen("list")}
+      onNewOrder={() => { setScreen("list"); setCompletedOrder(null); }}/>
+  );
+  if (screen==="cart") return (
+    <CartScreen cart={cart} setCart={setCart} company={company}
+      onSubmit={handleSubmit} onBack={() => setScreen("list")} submitting={submitting}/>
   );
 
-  // 제품 목록
   return (
-    <div style={{ background: "#fff", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+    <div style={{ background:"#fff", minHeight:"100vh", display:"flex", flexDirection:"column" }}>
+      <div style={{ padding:"20px 20px 0", flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: -0.5 }}>
+            <div style={{ fontWeight:800, fontSize:20 }}>
               {activeCat.label}
-              {activeCat.sub && <span style={{ fontWeight: 500, color: "#666", fontSize: 15, marginLeft: 4 }}>({activeCat.sub})</span>}
+              {activeCat.sub && <span style={{ fontWeight:500, color:"#666", fontSize:15, marginLeft:4 }}>({activeCat.sub})</span>}
             </div>
-            <div style={{ fontSize: 11, color: "#718096", marginTop: 2 }}>{company} · {filtered.length}개 제품</div>
+            <div style={{ fontSize:11, color:"#718096", marginTop:2 }}>{company} · {filtered.length}개</div>
           </div>
-          {/* 장바구니 버튼 */}
-          <button onClick={() => setShowCart(true)} style={{ position: "relative", background: "#2b6cb0", color: "#fff", border: "none", borderRadius: 24, padding: "10px 18px", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+          <button onClick={() => setScreen("cart")} style={{ position:"relative", background:"#2b6cb0", color:"#fff", border:"none", borderRadius:24, padding:"10px 18px", fontSize:15, fontWeight:700, cursor:"pointer" }}>
             🛒 발주함
-            {cartCount > 0 && (
-              <span style={{ position: "absolute", top: -6, right: -6, background: "#e53e3e", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{cartCount}</span>
-            )}
+            {cartCount > 0 && <span style={{ position:"absolute", top:-6, right:-6, background:"#e53e3e", color:"#fff", borderRadius:"50%", width:20, height:20, fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center" }}>{cartCount}</span>}
           </button>
         </div>
-
-        <div style={{ position: "relative", margin: "12px 0" }}>
-          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#aaa" }}>🔍</span>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="검색" style={{ width: "100%", padding: "11px 12px 11px 36px", border: "none", borderRadius: 12, background: "#f2f2f2", fontSize: 14, outline: "none" }}/>
+        <div style={{ position:"relative", margin:"12px 0" }}>
+          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:"#aaa" }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="검색"
+            style={{ width:"100%", padding:"11px 12px 11px 36px", border:"none", borderRadius:12, background:"#f2f2f2", fontSize:14, outline:"none" }}/>
         </div>
       </div>
 
-      {/* Grid */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 80px" }}>
+      <div style={{ flex:1, overflowY:"auto", padding:"0 16px 80px" }}>
         {loading ? (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#aaa" }}>불러오는 중...</div>
+          <div style={{ textAlign:"center", padding:"60px 0", color:"#aaa" }}>불러오는 중...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#aaa" }}>제품 없음</div>
+          <div style={{ textAlign:"center", padding:"60px 0", color:"#aaa" }}>제품 없음</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
             {filtered.map(p => {
               const inCart = cart[p.id]?.qty || 0;
               return (
                 <div key={p.id}>
-                  <div style={{ borderRadius: 12, overflow: "hidden", background: "#f5f5f5", aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                    {p.image
-                      ? <img src={p.image} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
-                      : <div style={{ fontSize: 34, opacity: 0.25 }}>📦</div>
-                    }
-                    {inCart > 0 && (
-                      <div style={{ position: "absolute", top: 8, left: 8, background: "#2b6cb0", color: "#fff", borderRadius: 12, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>×{inCart}</div>
-                    )}
+                  <div style={{ borderRadius:12, overflow:"hidden", background:"#f5f5f5", aspectRatio:"1", display:"flex", alignItems:"center", justifyContent:"center", position:"relative" }}>
+                    {p.image ? <img src={p.image} alt={p.name} style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <div style={{ fontSize:34, opacity:0.25 }}>📦</div>}
+                    {inCart > 0 && <div style={{ position:"absolute", top:8, left:8, background:"#2b6cb0", color:"#fff", borderRadius:12, padding:"2px 8px", fontSize:12, fontWeight:700 }}>×{inCart}</div>}
                   </div>
-                  <div style={{ padding: "8px 2px 4px" }}>
-                    <div style={{ color: "#2b6cb0", fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{fmtPrice(p.purchasePrice)}원</div>
-                    <div style={{ fontWeight: 700, fontSize: 12, lineHeight: 1.3, marginBottom: 6 }}>{p.name}</div>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div style={{ padding:"8px 2px 4px" }}>
+                    <div style={{ color:"#2b6cb0", fontWeight:700, fontSize:14, marginBottom:1 }}>{fmt(p.purchasePrice)}원</div>
+                    <div style={{ color:"#aaa", fontSize:11, marginBottom:3 }}>CBM {p.cbm} · {p.weight}</div>
+                    <div style={{ fontWeight:700, fontSize:12, lineHeight:1.3, marginBottom:6 }}>{p.name}</div>
+                    <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                       {inCart > 0 ? (
                         <>
-                          <button onClick={() => setQty(p.id, inCart - 1)} style={{ flex: 1, padding: "7px 0", border: "1.5px solid #e2e8f0", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 16 }}>−</button>
-                          <span style={{ fontSize: 14, fontWeight: 700, minWidth: 20, textAlign: "center" }}>{inCart}</span>
-                          <button onClick={() => setQty(p.id, inCart + 1)} style={{ flex: 1, padding: "7px 0", border: "1.5px solid #2b6cb0", borderRadius: 8, background: "#ebf4ff", cursor: "pointer", fontSize: 16 }}>+</button>
+                          <button onClick={() => setQty(p.id, inCart-1)} style={{ flex:1, padding:"7px 0", border:"1.5px solid #e2e8f0", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16 }}>−</button>
+                          <span style={{ fontSize:14, fontWeight:700, minWidth:20, textAlign:"center" }}>{inCart}</span>
+                          <button onClick={() => setQty(p.id, inCart+1)} style={{ flex:1, padding:"7px 0", border:"1.5px solid #2b6cb0", borderRadius:8, background:"#ebf4ff", cursor:"pointer", fontSize:16 }}>+</button>
                         </>
                       ) : (
-                        <button onClick={() => addToCart(p)} style={{ width: "100%", padding: "8px 0", border: "none", borderRadius: 8, background: "#2b6cb0", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ 발주 담기</button>
+                        <button onClick={() => addToCart(p)} style={{ width:"100%", padding:"8px 0", border:"none", borderRadius:8, background:"#2b6cb0", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>+ 발주 담기</button>
                       )}
                     </div>
                   </div>
@@ -333,12 +412,11 @@ function App() {
         )}
       </div>
 
-      {/* Bottom Tabs */}
-      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#fff", borderTop: "1px solid #eee", display: "flex", zIndex: 20 }}>
+      <div style={{ position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)", width:"100%", maxWidth:480, background:"#fff", borderTop:"1px solid #eee", display:"flex", zIndex:20 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => { setActiveTab(t.id); setSearch(""); }} style={{ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-            <span style={{ fontSize: 15, opacity: activeTab === t.id ? 1 : 0.4 }}>{activeTab === t.id ? "📋" : "📄"}</span>
-            <span style={{ fontSize: 10, fontWeight: 600, color: activeTab === t.id ? "#2b6cb0" : "#aaa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{t.label}</span>
+          <button key={t.id} onClick={() => { setActiveTab(t.id); setSearch(""); }} style={{ flex:1, border:"none", background:"none", padding:"10px 2px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+            <span style={{ fontSize:14, opacity:activeTab===t.id?1:0.4 }}>{activeTab===t.id?"📋":"📄"}</span>
+            <span style={{ fontSize:9, fontWeight:600, color:activeTab===t.id?"#2b6cb0":"#aaa", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>{t.label}</span>
           </button>
         ))}
       </div>
