@@ -16,238 +16,317 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react">
+<script type="text/babel">
 const { useState, useEffect, useRef } = React;
+
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-w7HA3OZR-yGstuywW8CBqsVbQ5kl_l1eDT0lpP9eRoy_ZVnM8KXoZHTjzgzrWt_l/exec";
+
 const TABS = [
-  { id: "Frozen", label: "Frozen", sub: "냉동제품" },
-  { id: "ROOMTEMP", label: "ROOMTEMP", sub: "실온제품" },
-  { id: "PET", label: "PET", sub: "펫용품" },
-  { id: "KBEAUTY", label: "K-BEAUTY", sub: "화장품" },
-  { id: "BRAND", label: "자체브랜드", sub: "" },
+  { id: "Frozen",   label: "Frozen",     sub: "냉동제품" },
+  { id: "ROOMTEMP", label: "ROOMTEMP",   sub: "실온제품" },
+  { id: "PET",      label: "PET",        sub: "펫용품" },
+  { id: "KBEAUTY",  label: "K-BEAUTY",   sub: "화장품" },
+  { id: "BRAND",    label: "자체브랜드",  sub: "" },
 ];
+
 const FIELDS = [
-  { key: "sku", label: "SKU", type: "text" },
-  { key: "name", label: "Name (한국어)", type: "text" },
-  { key: "engName", label: "Eng Name", type: "text" },
-  { key: "origin", label: "Made In", type: "text", placeholder: "예) KOREA" },
-  { key: "weight", label: "Weight", type: "text", placeholder: "예) 120g" },
-  { key: "purchasePrice", label: "Purchase Price", type: "number" },
-  { key: "customPrice", label: "Custom Price", type: "number" },
-  { key: "shelfLife", label: "Shelf life (Month)", type: "number" },
-  { key: "storage", label: "Storage", type: "text" },
-  { key: "quantity", label: "Quantity", type: "number" },
-  { key: "cbm", label: "CBM", type: "number" },
-  { key: "hscode", label: "HSCODE", type: "text" },
-  { key: "barcode", label: "Barcode", type: "text" },
-  { key: "category", label: "Category", type: "text" },
+  { key: "sku",           label: "SKU",               type: "text" },
+  { key: "name",          label: "Name (한국어)",      type: "text" },
+  { key: "engName",       label: "Eng Name",           type: "text" },
+  { key: "origin",        label: "Made In",            type: "text",   placeholder: "예) KOREA" },
+  { key: "weight",        label: "Weight",             type: "text",   placeholder: "예) 120g" },
+  { key: "purchasePrice", label: "Purchase Price",     type: "number", hidden: true },
+  { key: "customPrice",   label: "Custom Price",       type: "number" },
+  { key: "shelfLife",     label: "Shelf life (Month)", type: "number" },
+  { key: "storage",       label: "Storage",            type: "text",   placeholder: "예) Frozen / Room Temp" },
+  { key: "quantity",      label: "Quantity",           type: "number" },
+  { key: "cbm",           label: "CBM",                type: "number", placeholder: "예) 0.023936" },
+  { key: "hscode",        label: "HSCODE",             type: "text",   placeholder: "예) 0304.89-4000" },
+  { key: "barcode",       label: "Barcode",            type: "text" },
+  { key: "category",      label: "Category",           type: "text",   placeholder: "예) seafood" },
 ];
+
 const EMPTY = Object.fromEntries(FIELDS.map(f => [f.key, ""]));
-function fmt(v) {
+
+const TEXT_FIELDS = ["sku","hscode","barcode","storage","category","origin","weight"];
+function fmt(v, key) {
   if (v === "" || v == null) return "-";
+  if (key && TEXT_FIELDS.includes(key)) return String(v);
   const n = Number(v);
   return (!isNaN(n) && v !== "") ? n.toLocaleString() : v;
 }
-function fmtPrice(v) { return v ? Number(v).toLocaleString() : ""; }
+function fmtPrice(v) {
+  return v ? Number(v).toLocaleString() : "";
+}
 
+// ── Detail Screen ──
 function DetailScreen({ product, onBack, onEdit, onDelete }) {
   return (
-    <div style={{background:"#fff",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
-      <div style={{padding:"20px 20px 0"}}>
-        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#7a8c5e",padding:0,marginBottom:16}}>←</button>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>
-          <div style={{flex:1,paddingRight:12}}>
-            <div style={{fontWeight:800,fontSize:24,lineHeight:1.2}}>{product.name}</div>
-            <div style={{color:"#888",fontSize:14,marginTop:4}}>{product.engName}</div>
+    <div style={{ background: "#fff", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "20px 20px 0" }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#7a8c5e", padding: 0, marginBottom: 16 }}>←</button>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ flex: 1, paddingRight: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 24, lineHeight: 1.2 }}>{product.name}</div>
+            <div style={{ color: "#888", fontSize: 14, marginTop: 4 }}>{product.engName}</div>
           </div>
-          <button onClick={() => onEdit(product)} style={{background:"#7a8c5e",color:"#fff",border:"none",borderRadius:24,padding:"10px 18px",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>✏️ Edit</button>
+          <button onClick={() => onEdit(product)} style={{ background: "#7a8c5e", color: "#fff", border: "none", borderRadius: 24, padding: "10px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 5 }}>
+            ✏️ Edit
+          </button>
         </div>
-        {product.origin && <div style={{fontWeight:800,fontSize:15,marginTop:10}}>MADE IN {String(product.origin).toUpperCase()}</div>}
+        {product.origin && <div style={{ fontWeight: 800, fontSize: 15, marginTop: 10 }}>MADE IN {String(product.origin).toUpperCase()}</div>}
       </div>
-      {product.image && <div style={{padding:"12px 20px"}}><img src={product.image} alt={product.name} style={{width:"100%",borderRadius:14,objectFit:"cover",maxHeight:200}}/></div>}
-      <div style={{flex:1,padding:"8px 20px 120px"}}>
-        {FIELDS.filter(f => !["name","engName"].includes(f.key)).map(f => {
+
+      {product.image && (
+        <div style={{ padding: "12px 20px" }}>
+          <img src={product.image} alt={product.name} style={{ width: "100%", borderRadius: 14, objectFit: "cover", maxHeight: 200 }}/>
+        </div>
+      )}
+
+      <div style={{ flex: 1, padding: "8px 20px 120px" }}>
+        {FIELDS.filter(f => !["name","engName"].includes(f.key) && !f.hidden).map(f => {
           const val = product[f.key];
           if (!val && val !== 0) return null;
           return (
-            <div key={f.key} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0",borderBottom:"1px solid #f0f0f0"}}>
-              <span style={{color:"#999",fontSize:15}}>{f.label}</span>
-              <span style={{fontWeight:600,fontSize:15,textAlign:"right",maxWidth:"60%"}}>{fmt(val)}</span>
+            <div key={f.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid #f0f0f0" }}>
+              <span style={{ color: "#999", fontSize: 15 }}>{f.label}</span>
+              <span style={{ fontWeight: 600, fontSize: 15, textAlign: "right", maxWidth: "60%" }}>{fmt(val, f.key)}</span>
             </div>
           );
         })}
       </div>
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,padding:"12px 20px 32px",background:"#fff",borderTop:"1px solid #f0f0f0",display:"flex",gap:10}}>
-        <button onClick={() => { if(window.confirm("삭제할까요?")) onDelete(product); }} style={{flex:1,padding:15,border:"1.5px solid #fecaca",borderRadius:12,background:"#fff",color:"#e53e3e",fontSize:15,fontWeight:600,cursor:"pointer"}}>삭제</button>
-        <button onClick={onBack} style={{flex:2,padding:15,border:"none",borderRadius:12,background:"#7a8c5e",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>BACK!</button>
+
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, padding: "12px 20px 32px", background: "#fff", borderTop: "1px solid #f0f0f0", display: "flex", gap: 10 }}>
+        <button onClick={() => { if (window.confirm(`"${product.name}" 삭제할까요?`)) onDelete(product); }} style={{ flex: 1, padding: 15, border: "1.5px solid #fecaca", borderRadius: 12, background: "#fff", color: "#e53e3e", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>삭제</button>
+        <button onClick={onBack} style={{ flex: 2, padding: 15, border: "none", borderRadius: 12, background: "#7a8c5e", color: "#fff", fontSize: 16, fontWeight: 700, cursor: "pointer" }}>BACK!</button>
       </div>
     </div>
   );
 }
 
+// ── Add/Edit Form ──
 function ProductForm({ initial, onSave, onClose, saving }) {
-  const [form, setForm] = useState(initial ? {...initial} : {...EMPTY});
+  const [form, setForm] = useState(initial ? { ...initial } : { ...EMPTY });
   const fileRef = useRef();
+
   function handleImage(e) {
-    const file = e.target.files[0]; if (!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
     const r = new FileReader();
-    r.onload = ev => setForm(f => ({...f, image: ev.target.result}));
+    r.onload = ev => setForm(f => ({ ...f, image: ev.target.result }));
     r.readAsDataURL(file);
   }
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"flex-end",zIndex:100}} onClick={e => e.target===e.currentTarget && onClose()}>
-      <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,margin:"0 auto",padding:"24px 20px 40px",maxHeight:"90vh",overflowY:"auto"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-          <div style={{fontWeight:700,fontSize:17}}>{initial && initial.id ? "항목 수정" : "항목 추가"}</div>
-          <button onClick={onClose} style={{background:"#f0f0f0",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:16}}>✕</button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", zIndex: 100 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, margin: "0 auto", padding: "24px 20px 40px", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 17 }}>{initial?.id ? "항목 수정" : "항목 추가"}</div>
+          <button onClick={onClose} style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", fontSize: 16 }}>✕</button>
         </div>
+
         {FIELDS.map(f => (
-          <div key={f.key} style={{marginBottom:14}}>
-            <div style={{fontWeight:700,fontSize:13,marginBottom:5,color:"#333"}}>{f.label}</div>
-            <input type={f.type||"text"} value={form[f.key]||""} onChange={e => setForm(p => ({...p,[f.key]:e.target.value}))} placeholder={f.placeholder||""} style={{width:"100%",padding:"12px 14px",border:"1.5px solid #e8e8e8",borderRadius:10,fontSize:14,outline:"none",background:"#fafafa"}}/>
+          <div key={f.key} style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: "#333" }}>{f.label}</div>
+            <input
+              type={f.type || "text"}
+              value={form[f.key] ?? ""}
+              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+              placeholder={f.placeholder || ""}
+              style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none", background: "#fafafa" }}
+            />
           </div>
         ))}
-        <div style={{marginBottom:20}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:5,color:"#333"}}>Picture</div>
-          <div onClick={() => fileRef.current.click()} style={{border:"1.5px dashed #ccc",borderRadius:10,padding:14,textAlign:"center",cursor:"pointer",background:"#fafafa"}}>
-            {form.image ? <img src={form.image} alt="preview" style={{height:72,objectFit:"contain",borderRadius:8}}/> : <div style={{color:"#aaa",fontSize:14}}>이미지 선택...</div>}
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: "#333" }}>Picture</div>
+          <div onClick={() => fileRef.current.click()} style={{ border: "1.5px dashed #ccc", borderRadius: 10, padding: 14, textAlign: "center", cursor: "pointer", background: "#fafafa" }}>
+            {form.image
+              ? <img src={form.image} alt="preview" style={{ height: 72, objectFit: "contain", borderRadius: 8 }}/>
+              : <div style={{ color: "#aaa", fontSize: 14 }}>🖼 이미지 선택...</div>
+            }
           </div>
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{display:"none"}}/>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }}/>
         </div>
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={onClose} style={{flex:1,padding:15,border:"1.5px solid #e8e8e8",borderRadius:12,background:"#fff",fontSize:15,fontWeight:600,cursor:"pointer"}}>취소</button>
-          <button onClick={() => onSave(form)} disabled={saving} style={{flex:1,padding:15,border:"none",borderRadius:12,background:saving?"#b5c4a0":"#7a8c5e",color:"#fff",fontSize:15,fontWeight:700,cursor:saving?"default":"pointer"}}>{saving?"저장 중...":"전송"}</button>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: 15, border: "1.5px solid #e8e8e8", borderRadius: 12, background: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>취소</button>
+          <button onClick={() => onSave(form)} disabled={saving} style={{ flex: 1, padding: 15, border: "none", borderRadius: 12, background: saving ? "#b5c4a0" : "#7a8c5e", color: "#fff", fontSize: 15, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
+            {saving ? "저장 중..." : "전송"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+// ── Main App ──
 function App() {
-  const [activeTab,setActiveTab] = useState("Frozen");
-  const [products,setProducts] = useState([]);
-  const [loading,setLoading] = useState(false);
-  const [error,setError] = useState("");
-  const [search,setSearch] = useState("");
-  const [detail,setDetail] = useState(null);
-  const [showForm,setShowForm] = useState(false);
-  const [editTarget,setEditTarget] = useState(null);
-  const [menuOpen,setMenuOpen] = useState(null);
-  const [saving,setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("Frozen");
+  const [products, setProducts]   = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState("");
+  const [search, setSearch]       = useState("");
+  const [detail, setDetail]       = useState(null);
+  const [showForm, setShowForm]   = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [menuOpen, setMenuOpen]   = useState(null);
+  const [saving, setSaving]       = useState(false);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true); setError("");
     try {
-      const res = await fetch(SCRIPT_URL + "?action=getAll");
+      const res = await fetch(`${SCRIPT_URL}?action=getAll`);
       const text = await res.text();
       const data = JSON.parse(text);
       if (data.ok) setProducts(data.data);
       else setError("데이터 로드 실패");
-    } catch(e) { setError("연결 실패"); }
+    } catch { setError("연결 실패. 잠시 후 다시 시도해주세요."); }
     setLoading(false);
   }
 
   async function post(payload) {
-    const res = await fetch(SCRIPT_URL, {method:"POST", body:JSON.stringify(payload)});
-    const text = await res.text();
-    return JSON.parse(text);
+    const res = await fetch(SCRIPT_URL, { method: "POST", body: JSON.stringify(payload) });
+    return res.json();
   }
 
   async function handleSave(form) {
     if (!form.name) return;
     setSaving(true);
     if (editTarget) {
-      await post({action:"update", ...form, tab:activeTab, id:editTarget.id});
+      await post({ action: "update", ...form, tab: activeTab, id: editTarget.id });
     } else {
-      await post({action:"add", ...form, tab:activeTab, id:Date.now().toString()});
+      await post({ action: "add", ...form, tab: activeTab, id: Date.now().toString() });
     }
-    await load(); setSaving(false); setShowForm(false); setEditTarget(null);
+    await load();
+    setSaving(false);
+    setShowForm(false);
+    setEditTarget(null);
   }
 
   async function handleDelete(p) {
     setSaving(true);
-    await post({action:"delete", id:p.id});
-    await load(); setSaving(false); setDetail(null);
+    await post({ action: "delete", id: p.id });
+    await load();
+    setSaving(false);
+    setDetail(null);
   }
 
-  function openEdit(p) { setEditTarget(p); setShowForm(true); setMenuOpen(null); setDetail(null); }
+  function openEdit(p) {
+    setEditTarget(p);
+    setShowForm(true);
+    setMenuOpen(null);
+    setDetail(null);
+  }
 
   const filtered = products.filter(p =>
     p.tab === activeTab &&
-    (!search || (p.name && p.name.includes(search)) || (p.engName && p.engName.toLowerCase().includes(search.toLowerCase())) || (p.sku && p.sku.includes(search)))
+    (!search || p.name?.includes(search) || p.engName?.toLowerCase().includes(search.toLowerCase()) || p.sku?.includes(search))
   );
+
   const activeCat = TABS.find(t => t.id === activeTab);
 
-  if (detail) return <DetailScreen product={detail} onBack={() => setDetail(null)} onEdit={openEdit} onDelete={handleDelete}/>;
+  if (detail) return (
+    <DetailScreen
+      product={detail}
+      onBack={() => setDetail(null)}
+      onEdit={openEdit}
+      onDelete={handleDelete}
+    />
+  );
 
   return (
-    <div style={{background:"#fff",minHeight:"100vh",display:"flex",flexDirection:"column"}}>
-      <div style={{padding:"20px 20px 0",flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+    <div style={{ background: "#fff", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
-            <div style={{fontWeight:800,fontSize:20,letterSpacing:-0.5}}>
+            <div style={{ fontWeight: 800, fontSize: 20, letterSpacing: -0.5 }}>
               {activeCat.label}
-              {activeCat.sub && <span style={{fontWeight:500,color:"#666",fontSize:15,marginLeft:4}}>({activeCat.sub})</span>}
+              {activeCat.sub && <span style={{ fontWeight: 500, color: "#666", fontSize: 15, marginLeft: 4 }}>({activeCat.sub})</span>}
             </div>
-            <div style={{fontSize:11,color:saving?"#7a8c5e":"#ccc",marginTop:2}}>{saving?"저장 중...":filtered.length+"개 제품"}</div>
+            <div style={{ fontSize: 11, color: saving ? "#7a8c5e" : "#ccc", marginTop: 2 }}>
+              {saving ? "저장 중..." : `${filtered.length}개 제품`}
+            </div>
           </div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={load} style={{background:"#f2f2f2",border:"none",borderRadius:20,width:36,height:36,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>↻</button>
-            <button onClick={() => {setEditTarget(null);setShowForm(true);}} style={{background:"#7a8c5e",color:"#fff",border:"none",borderRadius:24,padding:"10px 18px",fontSize:15,fontWeight:700,cursor:"pointer"}}>+ Add</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={load} style={{ background: "#f2f2f2", border: "none", borderRadius: 20, width: 36, height: 36, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>↻</button>
+            <button onClick={() => { setEditTarget(null); setShowForm(true); }} style={{ background: "#7a8c5e", color: "#fff", border: "none", borderRadius: 24, padding: "10px 18px", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ fontSize: 18 }}>+</span> Add
+            </button>
           </div>
         </div>
-        <div style={{position:"relative",marginBottom:16}}>
-          <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#aaa"}}>🔍</span>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="검색" style={{width:"100%",padding:"12px 12px 12px 38px",border:"none",borderRadius:12,background:"#f2f2f2",fontSize:15,outline:"none"}}/>
+        <div style={{ position: "relative", marginBottom: 16 }}>
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#aaa" }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="검색" style={{ width: "100%", padding: "12px 12px 12px 38px", border: "none", borderRadius: 12, background: "#f2f2f2", fontSize: 15, outline: "none" }}/>
         </div>
       </div>
-      <div style={{flex:1,overflowY:"auto",padding:"0 16px 80px"}}>
+
+      {/* Grid */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 16px 80px" }}>
         {loading ? (
-          <div style={{textAlign:"center",padding:"60px 0",color:"#aaa",fontSize:14}}>불러오는 중...</div>
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#aaa", fontSize: 14 }}>⏳ 불러오는 중...</div>
         ) : error ? (
-          <div style={{textAlign:"center",padding:"60px 0"}}>
-            <div style={{color:"#e53e3e",fontSize:14,marginBottom:14}}>{error}</div>
-            <button onClick={load} style={{background:"#f0f4eb",border:"none",borderRadius:8,padding:"8px 16px",fontSize:13,cursor:"pointer",color:"#7a8c5e",fontWeight:600}}>다시 시도</button>
+          <div style={{ textAlign: "center", padding: "60px 0" }}>
+            <div style={{ color: "#e53e3e", fontSize: 14, marginBottom: 14 }}>⚠️ {error}</div>
+            <button onClick={load} style={{ background: "#f0f4eb", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", color: "#7a8c5e", fontWeight: 600 }}>다시 시도</button>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{textAlign:"center",padding:"60px 0",color:"#aaa",fontSize:14}}>제품 없음</div>
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#aaa", fontSize: 14 }}>
+            제품 없음<br/><span style={{ fontSize: 12 }}>+ Add 또는 구글 시트에서 추가하세요</span>
+          </div>
         ) : (
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {filtered.map(p => (
               <div key={p.id}>
-                <div onClick={() => setDetail(p)} style={{borderRadius:12,overflow:"hidden",background:"#f5f5f5",aspectRatio:"1",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative"}}>
-                  {p.image ? <img src={p.image} alt={p.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <div style={{fontSize:34,opacity:0.25}}>📦</div>}
-                  <button onClick={e => {e.stopPropagation();setMenuOpen(menuOpen===p.id?null:p.id);}} style={{position:"absolute",top:8,right:8,background:"rgba(255,255,255,0.85)",border:"none",borderRadius:20,width:32,height:32,cursor:"pointer",fontSize:14,fontWeight:700}}>···</button>
-                  {menuOpen===p.id && (
-                    <div style={{position:"absolute",top:44,right:8,background:"#fff",borderRadius:10,boxShadow:"0 4px 20px rgba(0,0,0,0.15)",zIndex:10,overflow:"hidden",minWidth:100}}>
-                      <button onClick={e => {e.stopPropagation();openEdit(p);}} style={{display:"block",width:"100%",padding:"12px 16px",border:"none",background:"none",textAlign:"left",fontSize:14,cursor:"pointer",borderBottom:"1px solid #f0f0f0"}}>✏️ 수정</button>
-                      <button onClick={e => {e.stopPropagation();if(window.confirm("삭제?"))handleDelete(p);}} style={{display:"block",width:"100%",padding:"12px 16px",border:"none",background:"none",textAlign:"left",fontSize:14,cursor:"pointer",color:"#e53e3e"}}>🗑 삭제</button>
+                <div onClick={() => setDetail(p)} style={{ borderRadius: 12, overflow: "hidden", background: "#f5f5f5", aspectRatio: "1", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" }}>
+                  {p.image
+                    ? <img src={p.image} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
+                    : <div style={{ fontSize: 34, opacity: 0.25 }}>📦</div>
+                  }
+                  <button onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === p.id ? null : p.id); }} style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.85)", border: "none", borderRadius: 20, width: 32, height: 32, cursor: "pointer", fontSize: 14, fontWeight: 700, backdropFilter: "blur(4px)" }}>···</button>
+                  {menuOpen === p.id && (
+                    <div style={{ position: "absolute", top: 44, right: 8, background: "#fff", borderRadius: 10, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", zIndex: 10, overflow: "hidden", minWidth: 100 }}>
+                      <button onClick={e => { e.stopPropagation(); openEdit(p); }} style={{ display: "block", width: "100%", padding: "12px 16px", border: "none", background: "none", textAlign: "left", fontSize: 14, cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}>✏️ 수정</button>
+                      <button onClick={e => { e.stopPropagation(); if(window.confirm(`"${p.name}" 삭제?`)) handleDelete(p); }} style={{ display: "block", width: "100%", padding: "12px 16px", border: "none", background: "none", textAlign: "left", fontSize: 14, cursor: "pointer", color: "#e53e3e" }}>🗑 삭제</button>
                     </div>
                   )}
                 </div>
-                <div onClick={() => setDetail(p)} style={{padding:"8px 4px 4px",cursor:"pointer"}}>
-                  <div style={{color:"#7a8c5e",fontWeight:700,fontSize:15,marginBottom:2}}>{fmtPrice(p.customPrice||p.purchasePrice)}</div>
-                  <div style={{fontWeight:700,fontSize:13,lineHeight:1.3,marginBottom:2}}>{p.name}</div>
-                  <div style={{color:"#888",fontSize:12,lineHeight:1.3}}>{p.engName}</div>
-                  {p.sku && <div style={{color:"#bbb",fontSize:11,marginTop:2}}>SKU: {p.sku}</div>}
+                <div onClick={() => setDetail(p)} style={{ padding: "8px 4px 4px", cursor: "pointer" }}>
+                  <div style={{ color: "#7a8c5e", fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{fmtPrice(p.customPrice || p.purchasePrice)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3, marginBottom: 2 }}>{p.name}</div>
+                  <div style={{ color: "#888", fontSize: 12, lineHeight: 1.3 }}>{p.engName}</div>
+                  {p.sku && <div style={{ color: "#bbb", fontSize: 11, marginTop: 2 }}>SKU: {p.sku}</div>}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#fff",borderTop:"1px solid #eee",display:"flex",zIndex:20}}>
+
+      {/* Bottom Tabs */}
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#fff", borderTop: "1px solid #eee", display: "flex", zIndex: 20 }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => {setActiveTab(t.id);setSearch("");setMenuOpen(null);}} style={{flex:1,border:"none",background:"none",padding:"10px 4px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-            <span style={{fontSize:15,opacity:activeTab===t.id?1:0.4}}>{activeTab===t.id?"📋":"📄"}</span>
-            <span style={{fontSize:10,fontWeight:600,color:activeTab===t.id?"#7a8c5e":"#aaa",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{t.label}</span>
+          <button key={t.id} onClick={() => { setActiveTab(t.id); setSearch(""); setMenuOpen(null); }} style={{ flex: 1, border: "none", background: "none", padding: "10px 4px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+            <span style={{ fontSize: 15, opacity: activeTab === t.id ? 1 : 0.4 }}>{activeTab === t.id ? "📋" : "📄"}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, color: activeTab === t.id ? "#7a8c5e" : "#aaa", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{t.label}</span>
           </button>
         ))}
       </div>
-      {menuOpen && <div onClick={() => setMenuOpen(null)} style={{position:"fixed",inset:0,zIndex:9}}/>}
-      {showForm && <ProductForm initial={editTarget} onSave={handleSave} onClose={() => {setShowForm(false);setEditTarget(null);}} saving={saving}/>}
+
+      {menuOpen && <div onClick={() => setMenuOpen(null)} style={{ position: "fixed", inset: 0, zIndex: 9 }}/>}
+
+      {showForm && (
+        <ProductForm
+          initial={editTarget}
+          onSave={handleSave}
+          onClose={() => { setShowForm(false); setEditTarget(null); }}
+          saving={saving}
+        />
+      )}
     </div>
   );
 }
