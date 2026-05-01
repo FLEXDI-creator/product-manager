@@ -160,7 +160,8 @@ function CartScreen({ cart, setCart, company, onSubmit, onBack, submitting }) {
   const [memo, setMemo] = useState("");
 
   const items = Object.values(cart).filter(i => i.qty > 0);
-  const totalAmt = items.reduce((s, i) => s + (Number(i.purchasePrice)||0) * i.qty, 0);
+  const cartonPrice = (i) => (Number(i.purchasePrice)||0) * (Number(i.quantity)||1);
+  const totalAmt = items.reduce((s, i) => s + cartonPrice(i) * i.qty, 0);
   const totalCbm = items.reduce((s, i) => s + (Number(i.cbm)||0) * i.qty, 0);
   const grandTotal = totalAmt + (Number(logistics)||0) + (Number(domestic)||0) - (Number(discount)||0);
 
@@ -174,9 +175,10 @@ function CartScreen({ cart, setCart, company, onSubmit, onBack, submitting }) {
     if (items.length === 0) { alert("발주 제품을 선택해주세요."); return; }
     const orderItems = items.map(i => ({
       sku: i.sku, name: i.name, engName: i.engName, weight: i.weight,
-      price: Number(i.purchasePrice)||0, qty: i.qty,
+      unitPrice: Number(i.purchasePrice)||0, quantity: Number(i.quantity)||1,
+      price: cartonPrice(i), qty: i.qty,
       itemCbm: (Number(i.cbm)||0) * i.qty,
-      subtotal: (Number(i.purchasePrice)||0) * i.qty
+      subtotal: cartonPrice(i) * i.qty
     }));
     onSubmit({ customerName, items: orderItems, logistics, domestic, discount, memo, totalAmt, totalCbm, grandTotal });
   }
@@ -215,8 +217,9 @@ function CartScreen({ cart, setCart, company, onSubmit, onBack, submitting }) {
                 </div>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#f7fafc", borderRadius:8, padding:"8px 12px" }}>
                   <div style={{ fontSize:12 }}>
-                    <span style={{ color:"#718096" }}>CBM: </span><b style={{ color:"#2b6cb0" }}>{fmtCbm((Number(item.cbm)||0)*item.qty)}</b>
-                    <span style={{ color:"#718096", marginLeft:8 }}>금액: </span><b>{fmt((Number(item.purchasePrice)||0)*item.qty)}원</b>
+                    <span style={{ color:"#718096" }}>입수: {item.quantity}개 · 박스단가: </span><b>{fmt((Number(item.purchasePrice)||0)*(Number(item.quantity)||1))}원</b>
+                    <span style={{ color:"#718096", marginLeft:4 }}>· CBM: </span><b style={{ color:"#2b6cb0" }}>{fmtCbm((Number(item.cbm)||0)*item.qty)}</b>
+                    <span style={{ color:"#718096", marginLeft:4 }}>· 금액: </span><b>{fmt((Number(item.purchasePrice)||0)*(Number(item.quantity)||1)*item.qty)}원</b>
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <button onClick={() => setQty(item.id, item.qty-1)} style={{ width:28, height:28, border:"1.5px solid #e2e8f0", borderRadius:8, background:"#fff", cursor:"pointer", fontSize:16 }}>−</button>
@@ -390,8 +393,8 @@ function App() {
                     {inCart > 0 && <div style={{ position:"absolute", top:8, left:8, background:"#2b6cb0", color:"#fff", borderRadius:12, padding:"2px 8px", fontSize:12, fontWeight:700 }}>×{inCart}</div>}
                   </div>
                   <div style={{ padding:"8px 2px 4px" }}>
-                    <div style={{ color:"#2b6cb0", fontWeight:700, fontSize:14, marginBottom:1 }}>{fmt(p.purchasePrice)}원</div>
-                    <div style={{ color:"#aaa", fontSize:11, marginBottom:3 }}>CBM {p.cbm} · {p.weight}</div>
+                    <div style={{ color:"#2b6cb0", fontWeight:700, fontSize:14, marginBottom:1 }}>{fmt((Number(p.purchasePrice)||0)*(Number(p.quantity)||1))}원/박스</div>
+                    <div style={{ color:"#aaa", fontSize:11, marginBottom:3 }}>입수: {p.quantity}개 · CBM {p.cbm} · {p.weight}</div>
                     <div style={{ fontWeight:700, fontSize:12, lineHeight:1.3, marginBottom:6 }}>{p.name}</div>
                     <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                       {inCart > 0 ? (
