@@ -62,7 +62,7 @@ function fmtPrice(v) {
 }
 
 // ── Detail Screen ──
-function DetailScreen({ product, onBack, onEdit, onDelete }) {
+function DetailScreen({ product, onBack }) {
   return (
     <div style={{ background: "#fff", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "20px 20px 0" }}>
@@ -76,9 +76,7 @@ function DetailScreen({ product, onBack, onEdit, onDelete }) {
             {product.URL && (
               <a href={product.URL} target="_blank" rel="noopener noreferrer" style={{ background:"#f0f4eb", color:"#7a8c5e", border:"1.5px solid #7a8c5e", borderRadius:24, padding:"10px 14px", fontSize:14, fontWeight:700, cursor:"pointer", textDecoration:"none", display:"flex", alignItems:"center" }}>👁 보기</a>
             )}
-            <button onClick={() => onEdit(product)} style={{ background: "#7a8c5e", color: "#fff", border: "none", borderRadius: 24, padding: "10px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-              ✏️ Edit
-            </button>
+
           </div>
         </div>
         {product.origin && <div style={{ fontWeight: 800, fontSize: 15, marginTop: 10 }}>MADE IN {String(product.origin).toUpperCase()}</div>}
@@ -111,62 +109,7 @@ function DetailScreen({ product, onBack, onEdit, onDelete }) {
   );
 }
 
-// ── Add/Edit Form ──
-function ProductForm({ initial, onSave, onClose, saving }) {
-  const [form, setForm] = useState(initial ? { ...initial } : { ...EMPTY });
-  const fileRef = useRef();
 
-  function handleImage(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = ev => setForm(f => ({ ...f, image: ev.target.result }));
-    r.readAsDataURL(file);
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", zIndex: 100 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: "#fff", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, margin: "0 auto", padding: "24px 20px 40px", maxHeight: "90vh", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 17 }}>{initial?.id ? "항목 수정" : "항목 추가"}</div>
-          <button onClick={onClose} style={{ background: "#f0f0f0", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", fontSize: 16 }}>✕</button>
-        </div>
-
-        {FIELDS.map(f => (
-          <div key={f.key} style={{ marginBottom: 14 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: "#333" }}>{f.label}</div>
-            <input
-              type={f.type || "text"}
-              value={form[f.key] ?? ""}
-              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-              placeholder={f.placeholder || ""}
-              style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #e8e8e8", borderRadius: 10, fontSize: 14, outline: "none", background: "#fafafa" }}
-            />
-          </div>
-        ))}
-
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: "#333" }}>Picture</div>
-          <div onClick={() => fileRef.current.click()} style={{ border: "1.5px dashed #ccc", borderRadius: 10, padding: 14, textAlign: "center", cursor: "pointer", background: "#fafafa" }}>
-            {form.image
-              ? <img src={form.image} alt="preview" style={{ height: 72, objectFit: "contain", borderRadius: 8 }}/>
-              : <div style={{ color: "#aaa", fontSize: 14 }}>🖼 이미지 선택...</div>
-            }
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }}/>
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 15, border: "1.5px solid #e8e8e8", borderRadius: 12, background: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>취소</button>
-          <button onClick={() => onSave(form)} disabled={saving} style={{ flex: 1, padding: 15, border: "none", borderRadius: 12, background: saving ? "#b5c4a0" : "#7a8c5e", color: "#fff", fontSize: 15, fontWeight: 700, cursor: saving ? "default" : "pointer" }}>
-            {saving ? "저장 중..." : "전송"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main App ──
 function App() {
@@ -176,10 +119,7 @@ function App() {
   const [error, setError]         = useState("");
   const [search, setSearch]       = useState("");
   const [detail, setDetail]       = useState(null);
-  const [showForm, setShowForm]   = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
   const [menuOpen, setMenuOpen]   = useState(null);
-  const [saving, setSaving]       = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -200,32 +140,11 @@ function App() {
     return res.json();
   }
 
-  async function handleSave(form) {
-    if (!form.name) return;
-    setSaving(true);
-    if (editTarget) {
-      await post({ action: "update", ...form, tab: activeTab, id: editTarget.id });
-    } else {
-      await post({ action: "add", ...form, tab: activeTab, id: Date.now().toString() });
-    }
-    await load();
-    setSaving(false);
-    setShowForm(false);
-    setEditTarget(null);
-  }
-
   async function handleDelete(p) {
     setSaving(true);
     await post({ action: "delete", id: p.id });
     await load();
     setSaving(false);
-    setDetail(null);
-  }
-
-  function openEdit(p) {
-    setEditTarget(p);
-    setShowForm(true);
-    setMenuOpen(null);
     setDetail(null);
   }
 
@@ -240,8 +159,6 @@ function App() {
     <DetailScreen
       product={detail}
       onBack={() => setDetail(null)}
-      onEdit={openEdit}
-      onDelete={handleDelete}
     />
   );
 
