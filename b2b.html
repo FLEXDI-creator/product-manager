@@ -83,41 +83,35 @@ function OrderSheet({ order, company, onBack, onNewOrder }) {
   const grandTotal = order.totalAmt + logistics_ + domestic_ - discount_;
 
   function downloadExcel() {
-    const rows = [
+    var rows = [
       ["청해담 발주서"],
       ["발주일", today, "거래처", order.customerName, "회사", company],
       [],
-      ["SKU", "제품명(한국)", "제품명(영문)", "중량", "입수량", "낱개단가", "박스단가", "박스수", "CBM", "금액"],
-      ...order.items.map(i => [
-        i.sku, i.name, i.engName, i.weight,
-        i.quantity, i.unitPrice,
-        i.price, i.qty,
-        Number(i.itemCbm).toFixed(4),
-        i.subtotal
-      ]),
-      [],
-      ["", "", "", "", "", "", "", "", "소계", order.totalAmt],
-      ["", "", "", "", "", "", "", "", "총 CBM", Number(order.totalCbm).toFixed(4)],
-      logistics_ > 0 ? ["", "", "", "", "", "", "", "", "물류비", logistics_] : null,
-      domestic_ > 0 ? ["", "", "", "", "", "", "", "", "국내배송비", domestic_] : null,
-      discount_ > 0 ? ["", "", "", "", "", "", "", "", "할인", -discount_] : null,
-      ["", "", "", "", "", "", "", "", "최종합계", grandTotal],
-    ].filter(Boolean);
+      ["SKU", "제품명(한국)", "제품명(영문)", "중량", "입수량", "낱개단가", "박스단가", "박스수", "CBM", "금액"]
+    ];
+    order.items.forEach(function(i) {
+      rows.push([i.sku, i.name, i.engName, i.weight, i.quantity, i.unitPrice, i.price, i.qty, Number(i.itemCbm).toFixed(4), i.subtotal]);
+    });
+    rows.push([]);
+    rows.push(["","","","","","","","","소계", order.totalAmt]);
+    rows.push(["","","","","","","","","총 CBM", Number(order.totalCbm).toFixed(4)]);
+    if (logistics_ > 0) rows.push(["","","","","","","","","물류비", logistics_]);
+    if (domestic_ > 0) rows.push(["","","","","","","","","국내배송비", domestic_]);
+    if (discount_ > 0) rows.push(["","","","","","","","","할인", -discount_]);
+    rows.push(["","","","","","","","","최종합계", grandTotal]);
 
-    // CSV로 변환 (엑셀에서 열 수 있음)
-    const csv = rows.map(row => row.map(cell => {
-      const s = String(cell ?? "");
-      return s.includes(",") || s.includes("
-") ? `"${s}"` : s;
-    }).join(",")).join("
-");
+    var csv = rows.map(function(row) {
+      return row.map(function(cell) {
+        var s = cell == null ? "" : String(cell);
+        return s.indexOf(",") >= 0 ? ('"' + s + '"') : s;
+      }).join(",");
+    }).join("\r\n");
 
-    const BOM = "﻿";
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
     a.href = url;
-    a.download = `발주서_${order.customerName}_${today.replace(/\./g,"")}.csv`;
+    a.download = "발주서_" + order.customerName + "_" + today.replace(/\./g,"") + ".csv";
     a.click();
     URL.revokeObjectURL(url);
   }
