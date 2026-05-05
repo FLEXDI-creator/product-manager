@@ -27,6 +27,7 @@ const TABS = [
   { id: "PET",      label: "PET",        sub: "펫용품" },
   { id: "KBEAUTY",  label: "K-BEAUTY",   sub: "화장품" },
   { id: "BRAND",    label: "자체브랜드",  sub: "" },
+  { id: "NEW",      label: "NEW",        sub: "신제품" },
 ];
 
 const FIELDS = [
@@ -34,6 +35,8 @@ const FIELDS = [
   { key: "name",          label: "Name (한국어)",      type: "text" },
   { key: "engName",       label: "Eng Name",           type: "text" },
   { key: "origin",        label: "Made In",            type: "text",   placeholder: "예) KOREA" },
+  { key: "MMPA",          label: "MMPA",               type: "text" },
+  { key: "COA",           label: "COA",                type: "text" },
   { key: "weight",        label: "Weight",             type: "text",   placeholder: "예) 120g" },
   { key: "purchasePrice", label: "Purchase Price",     type: "number", hidden: true },
   { key: "customPrice",   label: "Custom Price",       type: "number" },
@@ -44,8 +47,6 @@ const FIELDS = [
   { key: "hscode",        label: "HSCODE",             type: "text",   placeholder: "예) 0304.89-4000" },
   { key: "barcode",       label: "Barcode",            type: "text" },
   { key: "category",      label: "Category",           type: "text",   placeholder: "예) seafood" },
-  { key: "MMPA",         label: "MMPA",               type: "text" },
-  { key: "COA",          label: "COA",                type: "text" },
 ];
 
 const EMPTY = Object.fromEntries(FIELDS.map(f => [f.key, ""]));
